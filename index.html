@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anne-Charlotte Baudonnière — E-Portfolio Couteau Suisse 3D</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Three.js + Environnement Studio PBR (RoomEnvironment) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+
+  <!-- Polices Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'sans-serif'],
+            engraved: ['Cormorant Garamond', 'Georgia', 'serif']
+          },
+          colors: {
+            raspberry: {
+              50: '#fdf2f7',
+              100: '#fce7f1',
+              200: '#fbcfe3',
+              300: '#f9a8cc',
+              400: '#f472aa',
+              500: '#ec488b',
+              600: '#db276d',
+              700: '#b81d58',
+              800: '#9d174d',
+              900: '#831843',
+              950: '#500724'
+            },
+            slateeng: {
+              850: '#162032',
+              900: '#0f172a',
+              950: '#080d1a'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      background-color: #fbf9fa;
+      color: #0f172a;
+      overflow-x: hidden;
+    }
+
+    #knife-3d-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+    #knife-3d-canvas:active {
+      cursor: grabbing;
+    }
+
+    @keyframes proofGlow {
+      0%, 100% {
+        box-shadow: 0 0 0 3px rgba(184, 29, 88, 0.25), 0 12px 30px -8px rgba(184, 29, 88, 0.35);
+      }
+      50% {
+        box-shadow: 0 0 0 6px rgba(219, 39, 109, 0.38), 0 16px 36px -6px rgba(184, 29, 88, 0.5);
+      }
+    }
+    .proof-highlight {
+      animation: proofGlow 1.8s ease-in-out 2;
+      box-shadow: 0 0 0 3px rgba(184, 29, 88, 0.28), 0 12px 28px -8px rgba(184, 29, 88, 0.3);
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-raspberry-700 selection:text-white min-h-screen h-screen overflow-hidden flex flex-col">
+
+  <!-- ======================================================================= -->
+  <!-- 1. SCÈNE PLEIN ÉCRAN : COUTEAU SUISSE 3D ROSE FRAMBOISE                 -->
+  <!-- ======================================================================= -->
+  <main class="w-full h-full flex-1 relative">
+    <div id="knife-stage" class="relative w-full h-full bg-[radial-gradient(ellipse_at_center,_#ffffff_0%,_#f7f1f4_58%,_#ede4e8_100%)] overflow-hidden">
+
+      <!-- Canvas WebGL Three.js -->
+      <canvas id="knife-3d-canvas"></canvas>
+
+      <!-- Calque portrait synchronisé en 3D sur l'écusson (évite le blocage WebGL en local) -->
+      <div id="shield-photo-overlay" class="hidden absolute top-0 left-0 pointer-events-none z-10 overflow-hidden">
+        <img id="shield-overlay-img" src="" alt="Anne-Charlotte Baudonnière" class="w-full h-full object-cover object-[50%_20%]" />
+      </div>
+
+      <!-- Boutons discrets en haut à droite uniquement quand le couteau est ouvert -->
+      <div id="open-controls" class="hidden fixed top-5 right-5 z-30 flex items-center gap-2">
+        <button onclick="openContactModal()" class="px-3.5 py-2 rounded-full bg-white/95 hover:bg-raspberry-50 text-raspberry-800 border border-raspberry-200 text-xs font-bold shadow-sm transition">
+          Contact &amp; CV
+        </button>
+        <button onclick="closeKnife()" class="px-4 py-2 rounded-full bg-raspberry-700 hover:bg-raspberry-800 text-white text-xs font-bold shadow-sm transition">
+          Refermer ✕
+        </button>
+      </div>
+
+      <!-- INFOBULLE FLOTTANTE AU SURVOL D'UN OUTIL 3D -->
+      <div id="tool-hover-tooltip" class="fixed z-30 pointer-events-none hidden transition-opacity duration-150">
+        <div class="bg-slateeng-950/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-raspberry-500/50 flex items-center gap-3">
+          <span id="tooltip-num" class="w-7 h-7 rounded-xl bg-raspberry-700 text-white font-display font-extrabold text-xs flex items-center justify-center">
+            05
+          </span>
+          <div>
+            <div id="tooltip-title" class="font-display font-bold text-sm leading-tight text-white">
+              Vie Associative
+            </div>
+            <div id="tooltip-toolname" class="text-[11px] text-raspberry-200 mt-0.5">
+              Tire-bouchon hélicoïdal
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ======================================================================= -->
+  <!-- 2. VUE DÉVELOPPÉE D'UNE CATÉGORIE (S'OUVRE AU CLIC SUR UN OUTIL 3D)     -->
+  <!-- ======================================================================= -->
+  <div id="category-overlay" class="fixed inset-0 z-50 hidden bg-slateeng-950/60 backdrop-blur-sm overflow-y-auto">
+    <div class="min-h-screen px-3 sm:px-6 py-6 sm:py-10 flex items-start justify-center">
+      <article id="category-card" class="bg-white rounded-3xl max-w-5xl w-full shadow-2xl border border-raspberry-200/70 overflow-hidden my-auto">
+        <!-- Contenu injecté dynamiquement -->
+      </article>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- 3. MODALE CONTACT, CV & LINKEDIN                                        -->
+  <!-- ======================================================================= -->
+  <div id="contact-modal" class="fixed inset-0 z-50 hidden bg-slateeng-950/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-raspberry-200/80 relative my-auto">
+      <button onclick="closeContactModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-raspberry-50 hover:bg-raspberry-100 text-raspberry-800 font-bold text-xs transition">✕</button>
+      <div class="flex items-center gap-3.5 mb-3">
+        <img id="contact-profile-img" src="photo CV.png" onerror="handleContactImgError(this)" alt="Anne-Charlotte Baudonnière" class="w-14 h-14 rounded-2xl object-cover object-[50%_22%] ring-2 ring-raspberry-700/40 shadow-xs" />
+        <div>
+          <span class="text-[11px] font-extrabold uppercase tracking-wider text-raspberry-700">Contact &amp; Mobilité</span>
+          <h3 class="font-display text-xl font-extrabold text-slateeng-900 leading-tight">Anne-Charlotte Baudonnière</h3>
+        </div>
+      </div>
+      <p class="text-xs text-slate-600 mb-4">Recherche Stage / V.I.E International · <strong>Mars 2027</strong> · Élève-Ingénieure 3A Supply Chain (SIGMA Clermont) × Double Diplôme Master MAE (IAE).</p>
+
+      <div class="space-y-2.5 text-xs">
+        <div class="p-3 rounded-xl bg-raspberry-50/60 border border-raspberry-100 flex items-center justify-between gap-2">
+          <span class="font-semibold text-slateeng-900 truncate">anne-charlotte.baudonniere@sigma-clermont.fr</span>
+          <button onclick="copyText('anne-charlotte.baudonniere@sigma-clermont.fr', this)" class="px-2.5 py-1 rounded-lg bg-raspberry-700 hover:bg-raspberry-800 text-white font-bold flex-shrink-0 transition">Copier</button>
+        </div>
+        <div class="p-3 rounded-xl bg-raspberry-50/60 border border-raspberry-100 flex items-center justify-between">
+          <span class="font-semibold text-slateeng-900">+33 7 83 04 76 50</span>
+          <button onclick="copyText('+33 7 83 04 76 50', this)" class="px-2.5 py-1 rounded-lg bg-slateeng-900 hover:bg-slate-800 text-white font-bold transition">Copier</button>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700">
+          📍 11 rue Beaudonnat, 63170 Aubière · Permis B
+        </div>
+      </div>
+
+      <!-- Section Téléchargement CV + LinkedIn & QR Code -->
+      <div class="mt-4 pt-4 border-t border-raspberry-100 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+        <div class="sm:col-span-2 space-y-2.5">
+          <a id="cv-download-btn" href="CV_Anne-Charlotte_Baudonniere.pdf" download="CV_Anne-Charlotte_Baudonniere.pdf" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-raspberry-700 to-raspberry-600 hover:from-raspberry-800 hover:to-raspberry-700 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition">
+            <span>📄</span>
+            <span>Télécharger mon CV (PDF)</span>
+          </a>
+          <a id="linkedin-profile-link" href="https://www.linkedin.com/in/anne-charlotte-baudonni%C3%A8re-480909321" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-4 rounded-xl bg-[#0A66C2] hover:bg-[#004182] text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition">
+            <span class="font-display font-extrabold">in</span>
+            <span>Voir mon profil LinkedIn</span>
+          </a>
+        </div>
+        <div class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-raspberry-50/70 border border-raspberry-200/80">
+          <img id="linkedin-qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=831843&bgcolor=fdf2f7&data=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fanne-charlotte-baudonni%25C3%25A8re-480909321" alt="QR Code LinkedIn" class="w-24 h-24 rounded-lg" />
+          <span class="text-[10px] font-bold text-raspberry-800 mt-1.5 text-center">Scanner LinkedIn</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- 4. SCRIPT PRINCIPAL : DONNÉES CENTRALISÉES + COUTEAU SUISSE 3D PBR      -->
+  <!-- ======================================================================= -->
+  <script>
+    /**
+     * =========================================================================
+     * CONFIGURATION (PHOTO PROFIL, CV PDF & LIEN LINKEDIN)
+     * =========================================================================
+     */
+    const PROFILE_PHOTO_CANDIDATES = ['photo CV.png', 'photo CV_3.png', 'photo CV_2.png'];
+    const CV_PDF_URL = 'CV_Anne-Charlotte_Baudonniere.pdf';
+    const LINKEDIN_URL = 'https://www.linkedin.com/in/anne-charlotte-baudonni%C3%A8re-480909321';
+
+    function handleContactImgError(imgEl) {
+      const idx = parseInt(imgEl.dataset.tryIdx || '0', 10) + 1;
+      if (idx < PROFILE_PHOTO_CANDIDATES.length) {
+        imgEl.dataset.tryIdx = String(idx);
+        imgEl.src = encodeURI(PROFILE_PHOTO_CANDIDATES[idx]);
+      } else {
+        imgEl.style.display = 'none';
+      }
+    }
+
+    // Historique de navigation entre rubriques (pour le bouton Retour)
+    let categoryHistory = [];
+    let currentCategoryId = null;
+
+    /**
+     * =========================================================================
+     * TABLEAU CENTRALISÉ `PORTFOLIO_DATA`
+     * =========================================================================
+     */
+    const PORTFOLIO_DATA = [
+      {
+        id: 'formation',
+        num: '01',
+        category: 'Formation',
+        toolLabel: 'Grande lame principale',
+        subtitle: 'Double Diplôme Ingénieure SIGMA Clermont × Master MAE (IAE)',
+        period: '2021 – 2027',
+        competences: [
+          'Analyser, modéliser et simuler',
+          'Concevoir, dimensionner et optimiser',
+          'Développer ses talents personnels et professionnels'
+        ],
+        summary: 'Comme la grande lame principale d’un couteau suisse, ma formation constitue le socle de tout mon parcours : rigueur scientifique (CPGE PSI), ingénierie des systèmes industriels et Supply Chain (SIGMA Clermont) et vision managériale (Master MAE à l’IAE).',
+        hasSigmaCompetences: true,
+        items: [
+          {
+            title: 'SIGMA Clermont (Clermont Auvergne INP) — Cycle Ingénieur',
+            period: '2024 – 2027 · Aubière',
+            tag: 'Filière SPL · Spécialité Supply Chain',
+            details: [
+              'Usine du Futur & Data : Enjeux de l’Usine du Futur, Data Science et aide à la décision en environnement complexe.',
+              'Conception & Ergonomie : Conception d’installations industrielles (C3I), conception et amélioration de postes de travail.',
+              'Systèmes Industriels & Logistique : Organisation des systèmes industriels, logistique, entreposage, recherche opérationnelle et simulation de flux.'
+            ]
+          },
+          {
+            title: 'IAE Clermont Auvergne — Double Diplôme Master MAE',
+            period: '2026 – 2027 · Clermont-Ferrand',
+            tag: 'Management & Administration des Entreprises',
+            details: [
+              'Stratégie d’entreprise, analyse financière, contrôle de gestion et droit des affaires.',
+              'Marketing, management des ressources humaines et pilotage de projets transverses.'
+            ]
+          },
+          {
+            title: 'Lycée Raspail — Classe Préparatoire aux Grandes Écoles (CPGE PSI)',
+            period: '2021 – 2024 · Paris 14e',
+            tag: 'Physique et Sciences de l’Ingénieur',
+            details: [
+              'Formation intensive en mathématiques, physique-chimie et sciences industrielles de l’ingénieur.',
+              'Acquisition de méthodes de travail rigoureuses et d’une forte capacité d’analyse.'
+            ]
+          }
+        ],
+        photos: [
+          { src: 'ecole-sigma.jpg', caption: 'Campus SIGMA Clermont · Clermont Auvergne INP', bg: '#fdf2f7', accent: '#b81d58' },
+          { src: 'IAE.jpg', caption: 'Double cursus Ingénierie & Management IAE', bg: '#f1f5f9', accent: '#0f172a' }
+        ],
+        reflexive: {
+          acquis: 'Capacité à croiser la modélisation technique des flux avec une lecture financière et stratégique des décisions industrielles.',
+          axes: 'Renforcer le vocabulaire technique anglais de la Supply Chain en vue d’un Stage / V.I.E international dès mars 2027.'
+        }
+      },
+      {
+        id: 'stages',
+        num: '02',
+        category: 'Stages',
+        toolLabel: 'Scie à bois dentelée',
+        subtitle: 'Limagrain Ingredients (Stage 2A) & L’Arche en Agenais (Stage 1A)',
+        period: '2025 – 2026',
+        competences: [
+          'Mesurer, piloter et contrôler',
+          'Manager des projets collaboratifs en situation interculturelle',
+          'Être acteur du développement durable'
+        ],
+        summary: 'À l’image de la scie dentelée faite pour le concret et le terrain, mes stages m’ont permis de me confronter à des enjeux réels : le pilotage analytique de la décarbonation fret (SBTi) chez Limagrain Ingredients et l’accompagnement humain au sein de L’Arche en Agenais.',
+        items: [
+          {
+            title: 'Limagrain Ingredients — Stage Supply Chain & Décarbonation (SBTi)',
+            period: 'Juin 2026 – Septembre 2026 (15 semaines) · Site d’Ennezat',
+            tag: 'Tuteur : Alexandre Dupuy Dourreau',
+            details: [
+              'Pilotage du reporting carbone fret FY26 (Scope 3 Well-to-Wheel, 199,7 M T·km France) aligné sur la Science Based Targets initiative.',
+              'Automatisation du calcul des distances via l’outil interne d’Arnaud Denis et validation de la Standard Operating Procedure (SOP) avec Ruud Klomp (coordinateur Europe).',
+              'Comparaison inter-annuelle FY25/FY26 et élaboration de leviers : biocarburant HVO100 (-82% GES), surpresseurs électriques Mouvex chez Jacquet (ROI < 1 an), report ferroviaire et plateforme ADEME EVE.',
+              'Support opérationnel sur l’ERP Divalto (commandes co-produits Farilima/Granulima) et inventaire physique annuel de la zone ATR à Riom.'
+            ]
+          },
+          {
+            title: 'L’Arche en Agenais — Stage Ouvrier & Immersion Humaine',
+            period: 'Juillet – Août 2025 (140h) · Astaffort (Lot-et-Garonne)',
+            tag: 'Tuteur : Alexandre Borie',
+            details: [
+              'Accompagnement quotidien d’adultes en situation de handicap mental au sein de la maisonnée Joyo (organisation des repas, planning hebdomadaire, activités artistiques et Café Arche).',
+              'Logistique des sorties extérieures, gestion des stocks de maison et sensibilisation aux gestes éco-responsables (tri sélectif, compostage, déplacements doux).'
+            ]
+          }
+        ],
+        photos: [
+          { src: 'Ennezat.jpg', caption: 'Site industriel Limagrain Ingredients · Ennezat', bg: '#fdf2f7', accent: '#b81d58' },
+          { src: "l'arche.jpg", caption: 'Maison Joyo · Communauté de L’Arche en Agenais', bg: '#eff6ff', accent: '#1d4ed8' }
+        ],
+        reflexive: {
+          acquis: 'Prise de recul entre modèles académiques et réalité du terrain ; capacité à transformer des bases de données hétérogènes en outils décisionnels.',
+          axes: 'Documenter les procédures « à chaud » et accompagner davantage la conduite du changement auprès des équipes opérationnelles.'
+        }
+      },
+      {
+        id: 'exppro',
+        num: '03',
+        category: 'Expérience Pro',
+        toolLabel: 'Ciseaux à ressort',
+        subtitle: 'Pédagogie, Tutorat Scientifique & Musical — Superprof & Domicordia',
+        period: '2021 – Présent',
+        competences: [
+          'Développer ses talents personnels et professionnels'
+        ],
+        summary: 'Tels les ciseaux de précision qui ajustent chaque détail sur-mesure, mes plus de 4 ans d’enseignement particulier et d’accompagnement à domicile m’ont appris à adapter ma pédagogie à chaque élève avec autonomie et exigence.',
+        items: [
+          {
+            title: 'Enseignante Particulière — Superprof',
+            period: 'Janvier 2023 – Présent · Collège & Lycée',
+            tag: 'Mathématiques, Physique-Chimie, Français & Piano',
+            details: [
+              'Préparation de cours sur-mesure en sciences (maths, physique), méthodologie rédactionnelle et pratique du piano / solfège.',
+              'Adaptation pédagogique au rythme et au profil de chaque élève pour restaurer la confiance et faire progresser les résultats.'
+            ]
+          },
+          {
+            title: 'Tutorat & Accompagnement à Domicile — Domicordia',
+            period: '2021 – Présent · Paris & Clermont-Ferrand',
+            tag: 'Organisation & Fiabilité',
+            details: [
+              'Aide aux devoirs, encadrement éducatif et gestion logistique des emplois du temps familiaux.',
+              'Sens aigu des responsabilités et communication régulière avec les parents.'
+            ]
+          }
+        ],
+        photos: [],
+        reflexive: {
+          acquis: 'Savoir vulgariser des concepts complexes et adapter sa communication à chaque interlocuteur.',
+          axes: 'Transposer cette posture de pédagogue dans l’animation d’ateliers Lean et la formation d’opérateurs en entreprise.'
+        }
+      },
+      {
+        id: 'projets',
+        num: '04',
+        category: 'Projets',
+        toolLabel: 'Lime à métaux & tournevis',
+        subtitle: 'Conception Industrielle, Simulation de Flux & Recherche TIPE',
+        period: '2021 – 2026',
+        competences: [
+          'Analyser, modéliser et simuler',
+          'Concevoir, dimensionner et optimiser'
+        ],
+        summary: 'Comme la lime et le tournevis qui façonnent, ajustent et assemblent chaque pièce, mes projets d’ingénierie m’ont permis de passer de l’analyse fonctionnelle et de la CAO 3D jusqu’au prototypage et à l’implantation d’une unité agroalimentaire.',
+        items: [
+          {
+            title: 'Projet 2A : Conception & Implantation d’une Légumerie Industrielle',
+            period: '2025 – 2026 · SIGMA Clermont',
+            tag: 'Analyse de flux & Layout aval',
+            details: [
+              'Conception complète de l’implantation (layout) et des procédés aval d’une unité de transformation de légumes.',
+              'Cartographie des flux matières/déchets, identification des goulots d’étranglement et optimisation ergonomique des postes.'
+            ]
+          },
+          {
+            title: 'Projet 1A (Cheffe de Groupe) : Mécanisme de Tri à 3 Composants',
+            period: '2024 – 2025 · SIGMA Clermont',
+            tag: 'CAO SolidWorks · Fabrication · Tests',
+            details: [
+              'Coordination d’une équipe étudiante pour concevoir, dimensionner, usiner et valider un mécanisme mécanique fonctionnel.',
+              'Gestion du planning, répartition des tâches et validation expérimentale des performances.'
+            ]
+          },
+          {
+            title: 'Travaux d’Initiative Personnelle Encadrés (TIPE — CPGE PSI)',
+            period: '2021 – 2024 · Lycée Raspail',
+            tag: 'Modélisation physique & Expérimentation',
+            details: [
+              'Bâtiments parasismiques : modélisation vibratoire et étude expérimentale d’amortisseurs harmoniques pour réduire la résonance des structures.',
+              'VMC double flux : analyse thermique, mesure expérimentale et optimisation du rendement énergétique d’un échangeur air-air.',
+              'Frein magnétique d’escalade : étude des courants de Foucault, dimensionnement du couple de freinage et validation par essais.'
+            ]
+          }
+        ],
+        photos: [
+          { src: 'Projet 2A.jpg', caption: 'Modélisation & implantation du layout légumerie (Projet 2A)', bg: '#fdf2f7', accent: '#b81d58' },
+          { src: 'Projet 1A.jpg', caption: 'Prototypage et essais du mécanisme de tri (Projet 1A)', bg: '#f1f5f9', accent: '#0f172a' }
+        ],
+        reflexive: {
+          acquis: 'Maîtrise du cycle complet d’un projet d’ingénierie (cahier des charges, CAO, prototypage, mesure des écarts).',
+          axes: 'Intégrer systématiquement une analyse du cycle de vie (ACV) dès les premières phases de conception.'
+        }
+      },
+      {
+        id: 'asso',
+        num: '05',
+        category: 'Vie Associative',
+        toolLabel: 'Tire-bouchon hélicoïdal',
+        subtitle: 'Responsable Foyers BDE (30 étudiants), Événementiel, Danse & Photo',
+        period: '2024 – Présent',
+        competences: [
+          'Manager des projets collaboratifs en situation interculturelle',
+          'Développer ses talents personnels et professionnels'
+        ],
+        summary: 'À l’image du tire-bouchon, symbole de convivialité et d’événementiel, ma vie associative au cœur de SIGMA Clermont mêle esprit fédérateur, management opérationnel d’équipes, gestion budgétaire et organisation d’événements d’envergure.',
+        items: [
+          {
+            title: 'Responsable Foyers — Bureau des Élèves (BDE SIGMA Clermont)',
+            period: 'Février 2026 – Présent',
+            tag: 'Management & Logistique Opérationnelle',
+            details: [
+              'Management et planning d’une équipe de 30 étudiants bénévoles pour l’exploitation quotidienne des foyers.',
+              'Gestion complète des stocks, approvisionnements, maintenance technique, suivi budgétaire et représentation officielle auprès de la Direction de l’école.'
+            ]
+          },
+          {
+            title: 'Remise des Diplômes (RDD) & Organisation du Gala Annuel',
+            period: '2024 – 2026 · SIGMA Clermont',
+            tag: 'Logistique 500 personnes · Partenariats',
+            details: [
+              'Organisation du Gala annuel (500 participants, dîner de gala et soirée jusqu’à 4h30) : responsable de la recherche et de la sélection du lieu ainsi que de la gestion complète du traiteur et des approvisionnements boissons.',
+              'Responsable recherche de sponsors entreprises et coordination des équipes bénévoles pour la cérémonie de Remise des Diplômes.'
+            ]
+          },
+          {
+            title: 'Co-pilotage Octobre Rose × Mon Bonnet Rose',
+            period: 'Octobre 2026 · SIGMA Clermont & FizZteam',
+            tag: 'Sensibilisation, Événementiel & Collecte Solidaire',
+            details: [
+              'Co-pilotage d’un mois de mobilisation et de sensibilisation au dépistage du cancer du sein en partenariat avec l’association Mon Bonnet Rose.',
+              'Organisation d’animations solidaires avec la FizZteam (bingo, karaoké, Just Dance) et d’une conférence-témoignage réunissant étudiants, enseignants et personnels.',
+              'Déploiement de collectes de fonds : défi « Un vêtement rose porté = un don récolté », cagnotte et arrondis solidaires.'
+            ]
+          },
+          {
+            title: 'Présidente Association Danse, Pompoms & Club Photographie',
+            period: '2024 – Présent',
+            tag: 'Culture & Cohésion',
+            details: [
+              'Présidente et professeure de danse (Rock et Valse), membre de l’équipe Pompoms et photographe active pour les événements du campus.'
+            ]
+          }
+        ],
+        photos: [
+          { src: 'BDE.jpeg', caption: 'Équipe BDE SIGMA Clermont · Gestion & vie étudiante', bg: '#fdf2f7', accent: '#b81d58' },
+          { src: 'FizZteam.jpg', caption: 'Équipe Foyers & FizZteam · Logistique et animations', bg: '#fdf4ff', accent: '#86198f' },
+          { src: 'Octobre RozZ.jpg', caption: 'Mobilisation Octobre Rose × Mon Bonnet Rose', bg: '#fdf2f7', accent: '#db276d' }
+        ],
+        reflexive: {
+          acquis: 'Véritable école du management : gestion des imprévus en temps réel, négociation fournisseurs/direction et fédération d’une équipe de 30 personnes.',
+          axes: 'Déléguer davantage les tâches opérationnelles pour conserver du temps sur la vision stratégique.'
+        }
+      },
+      {
+        id: 'hardskills',
+        num: '06',
+        category: 'Hard Skills',
+        toolLabel: 'Ouvre-boîte & petit tournevis',
+        subtitle: 'Data Analytics, Simulation de Flux, CAO 3D & Outils Supply Chain',
+        period: 'Maîtrise Technique',
+        competences: [
+          'Analyser, modéliser et simuler',
+          'Concevoir, dimensionner et optimiser',
+          'Mesurer, piloter et contrôler'
+        ],
+        summary: 'Comme l’ouvre-boîte et le petit tournevis conçus pour ouvrir les systèmes et régler chaque mécanisme, mes compétences techniques me permettent d’exploiter la donnée, d’automatiser le reporting et de modéliser les flux industriels.',
+        items: [
+          {
+            title: 'Data Science, BI & Automatisation',
+            period: 'Niveau Avancé',
+            tag: 'Excel (VBA, Power Query) · Power BI · SQL · Python',
+            details: [
+              'Développement de macros VBA et requêtes Power Query pour automatiser la consolidation de bases de données transport (SBTi).',
+              'Création de tableaux de bord décisionnels sous Power BI, requêtage SQL et scripts d’analyse sous Python.'
+            ]
+          },
+          {
+            title: 'Supply Chain, Simulation & ERP',
+            period: 'Application Industrielle',
+            tag: 'Arena · Divalto · EcoTransIT World · Lean',
+            details: [
+              'Modélisation et simulation de flux discrets sous Arena ; suivi des stocks et ordonnancement sous ERP Divalto.',
+              'Calcul d’empreinte carbone multimodale (EcoTransIT World, norme ISO 14083 / cadre SBTi).'
+            ]
+          },
+          {
+            title: 'Conception Mécanique & Automatisme',
+            period: 'Ingénierie SIGMA',
+            tag: 'SolidWorks · 3DExperience · Control Expert · Canva',
+            details: [
+              'Modélisation volumique, assemblages et mises en plan sous SolidWorks et 3DExperience.',
+              'Programmation d’automates sous Control Expert et communication visuelle sous Canva (score PIX : 170).'
+            ]
+          }
+        ],
+        photos: [],
+        reflexive: {
+          acquis: 'Capacité à automatiser des tâches répétitives pour libérer du temps d’analyse à forte valeur ajoutée.',
+          axes: 'Approfondir l’intégration entre Python/SQL et les ERP industriels (SAP / Divalto).'
+        }
+      },
+      {
+        id: 'softskills',
+        num: '07',
+        category: 'Soft Skills',
+        toolLabel: 'Décapsuleur & grand tournevis',
+        subtitle: 'Leadership Collaboratif, Adaptabilité Terrain & Esprit de Synthèse',
+        period: 'Savoir-Être',
+        competences: [
+          'Manager des projets collaboratifs en situation interculturelle',
+          'Développer ses talents personnels et professionnels'
+        ],
+        summary: 'Tel le décapsuleur qui crée du lien et débloque les situations grâce à l’énergie collective, mon savoir-être s’est forgé aussi bien sur le terrain industriel (Limagrain) et humain (L’Arche) que grâce à mon fort engagement associatif (BDE, Gala, Octobre Rose, danse) et au scoutisme.',
+        items: [
+          {
+            title: 'Leadership & Travail en Équipe Pluridisciplinaire',
+            period: 'Vie Associative (BDE, Gala, Octobre Rose) · Projets · Supply Chain',
+            tag: 'Fédération & Communication',
+            details: [
+              'Capacité développée grâce à l’associatif et aux stages à mobiliser des profils variés (étudiants bénévoles, prestataires, opérateurs, transporteurs, direction) autour d’un objectif commun.',
+              'Aisance relationnelle permettant d’aller chercher l’information sur le terrain, de négocier avec tact et de fédérer durablement une équipe.'
+            ]
+          },
+          {
+            title: 'Adaptabilité, Patience & Résilience',
+            period: 'Associatif · L’Arche · Limagrain · CPGE',
+            tag: 'Agilité face aux imprévus',
+            details: [
+              'Gestion sereine des aléas opérationnels (imprévus événementiels en associatif pour 500 personnes, urgences logistiques estivales, accompagnement du handicap).',
+              'Esprit critique et de synthèse permettant de dégager des plans d’action clairs à partir de situations complexes.'
+            ]
+          }
+        ],
+        photos: [],
+        reflexive: {
+          acquis: 'Équilibre entre rigueur analytique et chaleur humaine, renforcé par mes responsabilités associatives et industrielles.',
+          axes: 'Affirmer encore davantage ma posture de future ingénieure pour défendre mes recommandations stratégiques.'
+        }
+      },
+      {
+        id: 'langues',
+        num: '08',
+        category: 'Langues',
+        toolLabel: 'Petite lame de précision',
+        subtitle: 'Ouverture Internationale — Préparation Stage / V.I.E Mars 2027',
+        period: '4 Langues Pratiquées',
+        competences: [
+          'Manager des projets collaboratifs en situation interculturelle',
+          'Développer ses talents personnels et professionnels'
+        ],
+        summary: 'Comme la petite lame de précision indispensable aux finitions délicates, la pratique de plusieurs langues me permet d’échanger avec justesse en contexte international, notamment au sein d’équipes Supply Chain européennes.',
+        items: [
+          {
+            title: 'Français — Langue Maternelle (C2)',
+            period: 'Rédaction technique & soutenances',
+            tag: 'C2 · Natif',
+            flagSvg: `<svg viewBox="0 0 3 2" class="w-full h-full" preserveAspectRatio="none"><rect width="1" height="2" fill="#002395"/><rect x="1" width="1" height="2" fill="#FFFFFF"/><rect x="2" width="1" height="2" fill="#ED2939"/></svg>`,
+            details: [
+              'Rédaction de rapports d’ingénierie, notes de synthèse stratégiques et animation de réunions.'
+            ]
+          },
+          {
+            title: 'Anglais — Niveau B2 (Professionnel)',
+            period: 'Usage quotidien en Supply Chain internationale',
+            tag: 'B2 · Objectif V.I.E 2027',
+            flagSvg: `<svg viewBox="0 0 60 36" class="w-full h-full" preserveAspectRatio="none"><rect width="60" height="36" fill="#012169"/><path d="M0,0 L60,36 M60,0 L0,36" stroke="#FFFFFF" stroke-width="6"/><path d="M0,0 L60,36 M60,0 L0,36" stroke="#C8102E" stroke-width="3.2"/><path d="M30,0 V36 M0,18 H60" stroke="#FFFFFF" stroke-width="10"/><path d="M30,0 V36 M0,18 H60" stroke="#C8102E" stroke-width="6"/></svg>`,
+            details: [
+              'Rédaction de procédures opérationnelles standardisées (SOP SBTi) en anglais et échanges directs avec la coordination européenne aux Pays-Bas (Ruud Klomp).'
+            ]
+          },
+          {
+            title: 'Allemand — Niveau B1 (Indépendant)',
+            period: 'Parcours scolaire & échanges culturels',
+            tag: 'B1 · Intermédiaire',
+            flagSvg: `<svg viewBox="0 0 3 2" class="w-full h-full" preserveAspectRatio="none"><rect width="3" height="0.67" y="0" fill="#000000"/><rect width="3" height="0.67" y="0.665" fill="#DD0000"/><rect width="3" height="0.67" y="1.33" fill="#FFCE00"/></svg>`,
+            details: [
+              'Compréhension et expression courante en allemand dans un cadre académique et culturel.'
+            ]
+          },
+          {
+            title: 'Espagnol — Niveau A2 (Élémentaire)',
+            period: 'Bases opérationnelles & voyages',
+            tag: 'A2 · Bases',
+            flagSvg: `<svg viewBox="0 0 750 500" class="w-full h-full" preserveAspectRatio="none"><rect width="750" height="500" fill="#AA151B"/><rect y="125" width="750" height="250" fill="#F1BF00"/><g transform="translate(185,155)"><rect x="24" y="14" width="62" height="16" rx="6" fill="#AA151B" stroke="#854D0E" stroke-width="3"/><path d="M20,30 H90 L84,18 H26 Z" fill="#F1BF00" stroke="#854D0E" stroke-width="3"/><circle cx="55" cy="10" r="5" fill="#F1BF00" stroke="#854D0E" stroke-width="2"/><rect x="0" y="42" width="14" height="118" rx="3" fill="#CBD5E1" stroke="#64748B" stroke-width="2"/><rect x="96" y="42" width="14" height="118" rx="3" fill="#CBD5E1" stroke="#64748B" stroke-width="2"/><path d="M-4,82 Q7,72 18,86 M92,86 Q103,72 114,82" stroke="#AA151B" stroke-width="6" fill="none"/><path d="M22,36 H88 V116 C88,144 55,158 55,158 C55,158 22,144 22,116 Z" fill="#FFFFFF" stroke="#854D0E" stroke-width="3"/><rect x="24" y="38" width="31" height="44" fill="#AA151B"/><rect x="55" y="38" width="31" height="44" fill="#F8FAFC"/><rect x="24" y="82" width="31" height="44" fill="#F1BF00"/><rect x="55" y="82" width="31" height="44" fill="#AA151B"/><rect x="33" y="82" width="7" height="44" fill="#AA151B"/><rect x="44" y="82" width="7" height="44" fill="#AA151B"/><circle cx="55" cy="82" r="11" fill="#1D4ED8" stroke="#AA151B" stroke-width="2.5"/></g></svg>`,
+            details: [
+              'Notions de communication courante en espagnol pour les échanges quotidiens et les déplacements.'
+            ]
+          }
+        ],
+        photos: [],
+        reflexive: {
+          acquis: 'Capacité à rédiger des livrables techniques en anglais et à collaborer avec des interlocuteurs européens.',
+          axes: 'Enrichir mon lexique spécialisé transport/douanes en anglais pour évoluer avec aisance en V.I.E.'
+        }
+      },
+      {
+        id: 'hobbies',
+        num: '09',
+        category: 'Hobbies',
+        toolLabel: 'Poinçon alésoir',
+        subtitle: 'Scouts, Famille, Musique (Chant, Orgue, Trompe), Sport & Lecture',
+        period: 'Équilibre & Passions',
+        competences: [
+          'Développer ses talents personnels et professionnels'
+        ],
+        summary: 'Comme le poinçon alésoir, outil de terrain par excellence des camps et de la débrouillardise, mes passions personnelles — scoutisme, famille, musique et sport — nourrissent mon énergie, mon ancrage et mon sens du collectif.',
+        items: [
+          {
+            title: 'Scouts — Vie dans la Nature, Service & Esprit d’Équipe',
+            period: 'Engagement de longue date',
+            tag: 'Autonomie · Fraternité · Débrouillardise',
+            details: [
+              'Apprentissage de la vie en collectivité, organisation de camps, prise de responsabilités auprès des plus jeunes et goût pour l’action concrète sur le terrain.'
+            ]
+          },
+          {
+            title: 'Famille — Valeurs de Partage, Entraide & Convivialité',
+            period: 'Pilier personnel',
+            tag: 'Équilibre & Transmission',
+            details: [
+              'Importance centrale accordée aux liens familiaux, à l’entraide intergénérationnelle et aux moments de partage qui forgent mon sens du collectif.'
+            ]
+          },
+          {
+            title: 'Musique — Chant, Orgue & Trompe de Chasse',
+            period: 'Pratique artistique & patrimoniale',
+            tag: 'Rigueur & Sensibilité musicale',
+            details: [
+              'Pratique du chant choral, de l’orgue et de la trompe de chasse (ainsi que du piano) : exigence technique, écoute harmonique et gestion du souffle.'
+            ]
+          },
+          {
+            title: 'Course à pied, Jeux de société, Lecture & Photographie',
+            period: 'Loisirs actifs & culturels',
+            tag: 'Endurance & Curiosité',
+            details: [
+              'Course à pied pour l’endurance et le dépassement de soi, jeux de société stratégiques, lecture et photographie.'
+            ]
+          }
+        ],
+        photos: [
+          { src: 'Scout (1).jpg', caption: 'Scouts · Camps, nature et esprit d’équipe', bg: '#ecfdf5', accent: '#047857' },
+          { src: 'Famille.jpg', caption: 'Famille · Moments de partage et convivialité', bg: '#fdf2f7', accent: '#b81d58' }
+        ],
+        reflexive: {
+          acquis: 'Le scoutisme et la musique m’ont appris la persévérance, le sens du service et la précision collective.',
+          axes: 'Continuer à cultiver cet équilibre entre engagement associatif, sport, famille et vie professionnelle.'
+        }
+      }
+    ];
+
+    /**
+     * COMPÉTENCES CLÉS — INGÉNIEURE SIGMA CLERMONT × MASTER MAE (IAE)
+     */
+    const SIGMA_COMPETENCES = [
+      { num: '1', title: 'Analyser, modéliser et simuler', toolId: 'projets', highlightIdx: 0, proof: 'Simulation de flux légumerie 2A, TIPE CPGE & modélisation EcoTransIT (Ennezat–Bangkok).' },
+      { num: '2', title: 'Concevoir, dimensionner et optimiser', toolId: 'projets', highlightIdx: 1, proof: 'Layout aval d’une légumerie, mécanisme de tri 1A (SolidWorks) et leviers flotte HVO100 / Jacquet.' },
+      { num: '3', title: 'Mesurer, piloter et contrôler', toolId: 'stages', highlightIdx: 0, proof: 'Consolidation Scope 3 SBTi (199,7 M T·km), inventaire physique ATR Riom et ERP Divalto.' },
+      { num: '4', title: 'Manager des projets collaboratifs en situation interculturelle', toolId: 'asso', highlightIdx: 0, proof: 'Management de 30 étudiants (Responsable Foyers BDE), Gala 500 personnes & coordination SBTi France / Pays-Bas.' },
+      { num: '5', title: 'Développer ses talents personnels et professionnels', toolId: 'exppro', highlightIdx: 0, proof: 'Double diplôme SIGMA × Master MAE (IAE), tutorat Superprof (4 ans), associatif, Scouts et musique.' },
+      { num: '6', title: 'Être acteur du développement durable', toolId: 'stages', highlightIdx: 0, proof: 'Feuille de route décarbonation Limagrain (-23,6 t CO2e/expédition) & engagement social L’Arche.' }
+    ];
+
+    // =========================================================================
+    // MOTEUR 3D THREE.JS — COUTEAU SUISSE HYPER-RÉALISTE ROSE FRAMBOISE
+    // =========================================================================
+    let scene, camera, renderer, knifeGroup, pmremGenerator;
+    let shieldPhotoMesh = null;
+    let useHtmlShieldOverlay = false;
+    let shieldLocalPts = null;
+    let handleMeshes = [];
+    let bladePivots = [];
+    let interactiveMeshes = [];
+    let hoveredSectionId = null;
+    let isKnifeOpen = false;
+    let targetOpen = 0;
+    let currentOpen = 0;
+
+    let isDragging = false;
+    let downPos = { x: 0, y: 0 };
+    let prevPos = { x: 0, y: 0 };
+    let targetRotY = -0.14;
+    let targetRotX = 0.12;
+    let targetZoom = 7.4;
+
+    let raycaster = null;
+    let pointerNDC = null;
+
+    function createEngravedHandleTextures() {
+      const width = 2048;
+      const height = 512;
+
+      const colorCanvas = document.createElement('canvas');
+      colorCanvas.width = width;
+      colorCanvas.height = height;
+      const ctx = colorCanvas.getContext('2d');
+
+      const bumpCanvas = document.createElement('canvas');
+      bumpCanvas.width = width;
+      bumpCanvas.height = height;
+      const bctx = bumpCanvas.getContext('2d');
+
+      ctx.clearRect(0, 0, width, height);
+      bctx.fillStyle = '#808080';
+      bctx.fillRect(0, 0, width, height);
+
+      const textX = 1120;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      bctx.textAlign = 'right';
+      bctx.textBaseline = 'middle';
+
+      function drawEngravedLine(text, y, font, mainColor, bumpLevel) {
+        ctx.font = font;
+        ctx.fillStyle = 'rgba(255, 195, 220, 0.34)';
+        ctx.fillText(text, textX, y + 2.2);
+
+        ctx.fillStyle = mainColor;
+        ctx.fillText(text, textX, y);
+
+        bctx.font = font;
+        bctx.fillStyle = bumpLevel;
+        bctx.fillText(text, textX, y);
+      }
+
+      drawEngravedLine(
+        'Anne-Charlotte Baudonnière',
+        162,
+        '800 66px "Plus Jakarta Sans", "Inter", sans-serif',
+        'rgba(48, 5, 22, 0.90)',
+        '#1a1a1a'
+      );
+
+      drawEngravedLine(
+        'Recherche Stage / V.I.E International · Mars 2027',
+        244,
+        '700 34px "Inter", sans-serif',
+        'rgba(58, 7, 27, 0.85)',
+        '#303030'
+      );
+
+      drawEngravedLine(
+        'Élève-Ingénieure 3A Supply Chain (SIGMA Clermont)',
+        318,
+        '600 28px "Inter", sans-serif',
+        'rgba(62, 8, 29, 0.82)',
+        '#3a3a3a'
+      );
+      drawEngravedLine(
+        '× Double Diplôme Master Management et Administration des Entreprises (IAE)',
+        362,
+        '600 25px "Inter", sans-serif',
+        'rgba(62, 8, 29, 0.82)',
+        '#3a3a3a'
+      );
+
+      const map = new THREE.CanvasTexture(colorCanvas);
+      map.encoding = THREE.sRGBEncoding;
+      map.anisotropy = 8;
+
+      const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+      bumpMap.anisotropy = 8;
+
+      return { map, bumpMap };
+    }
+
+    function drawCenteredPortraitOnCanvas(ctx, img, size) {
+      ctx.clearRect(0, 0, size, size);
+      const minSide = Math.min(img.width, img.height);
+      const sx = (img.width - minSide) * 0.5;
+      const sy = Math.max(0, (img.height - minSide) * 0.16);
+      ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+    }
+
+    function loadShieldPortrait() {
+      let idx = 0;
+      function tryNextCandidate() {
+        if (idx >= PROFILE_PHOTO_CANDIDATES.length) return;
+        const url = encodeURI(PROFILE_PHOTO_CANDIDATES[idx]);
+        idx++;
+        const img = new Image();
+        img.onload = () => {
+          const overlayImg = document.getElementById('shield-overlay-img');
+          if (overlayImg) {
+            overlayImg.src = url;
+            useHtmlShieldOverlay = true;
+          }
+          const contactImg = document.getElementById('contact-profile-img');
+          if (contactImg) {
+            contactImg.src = url;
+            contactImg.style.display = 'block';
+          }
+        };
+        img.onerror = tryNextCandidate;
+        img.src = url;
+      }
+      tryNextCandidate();
+    }
+
+    function updateShieldPhotoOverlay() {
+      const overlay = document.getElementById('shield-photo-overlay');
+      const stage = document.getElementById('knife-stage');
+      if (!overlay || !stage || !useHtmlShieldOverlay || !shieldPhotoMesh || !shieldLocalPts || !camera) return;
+
+      knifeGroup.updateMatrixWorld(true);
+
+      // Vérifie que la face avant de l'écusson est bien tournée vers la caméra
+      const worldNormal = new THREE.Vector3(0, 0, 1).transformDirection(shieldPhotoMesh.matrixWorld);
+      const worldCenter = new THREE.Vector3().setFromMatrixPosition(shieldPhotoMesh.matrixWorld);
+      const toCamera = camera.position.clone().sub(worldCenter).normalize();
+
+      if (worldNormal.dot(toCamera) <= 0.12) {
+        overlay.classList.add('hidden');
+        return;
+      }
+
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      const projected = shieldLocalPts.map(pt => {
+        const v = pt.clone().applyMatrix4(shieldPhotoMesh.matrixWorld).project(camera);
+        return {
+          x: (v.x * 0.5 + 0.5) * w,
+          y: (-v.y * 0.5 + 0.5) * h
+        };
+      });
+
+      const minX = Math.min(...projected.map(p => p.x));
+      const maxX = Math.max(...projected.map(p => p.x));
+      const minY = Math.min(...projected.map(p => p.y));
+      const maxY = Math.max(...projected.map(p => p.y));
+      const boxW = maxX - minX;
+      const boxH = maxY - minY;
+
+      if (boxW < 4 || boxH < 4) {
+        overlay.classList.add('hidden');
+        return;
+      }
+
+      const poly = projected
+        .map(p => `${(((p.x - minX) / boxW) * 100).toFixed(2)}% ${(((p.y - minY) / boxH) * 100).toFixed(2)}%`)
+        .join(', ');
+
+      overlay.style.left = `${minX}px`;
+      overlay.style.top = `${minY}px`;
+      overlay.style.width = `${boxW}px`;
+      overlay.style.height = `${boxH}px`;
+      overlay.style.clipPath = `polygon(${poly})`;
+      overlay.classList.remove('hidden');
+    }
+
+    function createShieldPortraitTexture() {
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Portrait vectoriel de secours si l'image n'est pas encore chargée
+      ctx.fillStyle = '#e5e7eb';
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.fillStyle = '#b81d58';
+      ctx.beginPath();
+      ctx.ellipse(256, 485, 210, 145, 0, Math.PI, 0);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(185, 365);
+      ctx.lineTo(256, 415);
+      ctx.lineTo(327, 365);
+      ctx.lineTo(305, 345);
+      ctx.lineTo(256, 382);
+      ctx.lineTo(207, 345);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#eec3a3';
+      ctx.fillRect(222, 290, 68, 82);
+
+      ctx.fillStyle = '#c89b54';
+      ctx.beginPath();
+      ctx.moveTo(145, 240);
+      ctx.bezierCurveTo(138, 115, 200, 72, 256, 72);
+      ctx.bezierCurveTo(312, 72, 374, 115, 367, 240);
+      ctx.bezierCurveTo(378, 315, 362, 355, 332, 362);
+      ctx.lineTo(180, 362);
+      ctx.bezierCurveTo(150, 355, 134, 315, 145, 240);
+      ctx.fill();
+
+      ctx.fillStyle = '#f5cfb3';
+      ctx.beginPath();
+      ctx.ellipse(256, 218, 84, 98, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#254e70';
+      ctx.beginPath();
+      ctx.arc(224, 210, 8, 0, Math.PI * 2);
+      ctx.arc(288, 210, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#9d174d';
+      ctx.lineWidth = 6;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(226, 252);
+      ctx.quadraticCurveTo(256, 282, 286, 252);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      const fallbackTex = new THREE.CanvasTexture(canvas);
+      fallbackTex.encoding = THREE.sRGBEncoding;
+      return fallbackTex;
+    }
+
+    function initRealisticSwissKnife() {
+      const stage = document.getElementById('knife-stage');
+      const canvas = document.getElementById('knife-3d-canvas');
+      if (!stage || !canvas || typeof THREE === 'undefined') return;
+
+      raycaster = new THREE.Raycaster();
+      pointerNDC = new THREE.Vector2(-99, -99);
+
+      scene = new THREE.Scene();
+
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      camera = new THREE.PerspectiveCamera(34, w / h, 0.1, 100);
+      camera.position.set(0, 0.15, targetZoom);
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+
+      if (typeof THREE.RoomEnvironment !== 'undefined') {
+        pmremGenerator = new THREE.PMREMGenerator(renderer);
+        const envTex = pmremGenerator.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+        scene.environment = envTex;
+      }
+
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xf3e8ee, 0.55);
+      scene.add(hemiLight);
+
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
+      keyLight.position.set(5, 8, 7);
+      scene.add(keyLight);
+
+      const rimLight = new THREE.DirectionalLight(0xfce4ec, 0.75);
+      rimLight.position.set(-6, 3, -5);
+      scene.add(rimLight);
+
+      knifeGroup = new THREE.Group();
+      scene.add(knifeGroup);
+
+      const raspberryCellidorMat = new THREE.MeshPhysicalMaterial({
+        color: 0xb81d58,
+        roughness: 0.13,
+        metalness: 0.02,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.07,
+        reflectivity: 0.95,
+        envMapIntensity: 1.2
+      });
+
+      function createPolishedSteelMat() {
+        return new THREE.MeshStandardMaterial({
+          color: 0xf1f5f9,
+          metalness: 0.96,
+          roughness: 0.14,
+          envMapIntensity: 1.45,
+          emissive: new THREE.Color(0x000000),
+          emissiveIntensity: 0
+        });
+      }
+
+      const linerAluMat = new THREE.MeshStandardMaterial({
+        color: 0xcbd5e1,
+        metalness: 0.88,
+        roughness: 0.28,
+        envMapIntensity: 1.1
+      });
+
+      const brassRivetMat = new THREE.MeshStandardMaterial({
+        color: 0xd4af37,
+        metalness: 0.92,
+        roughness: 0.22
+      });
+
+      const L = 3.55;
+      const R = 0.58;
+      const handleShape = new THREE.Shape();
+      handleShape.moveTo(-L + R, -R);
+      handleShape.lineTo(L - R, -R);
+      handleShape.absarc(L - R, 0, R, -Math.PI / 2, Math.PI / 2, false);
+      handleShape.lineTo(-L + R, R);
+      handleShape.absarc(-L + R, 0, R, Math.PI / 2, (3 * Math.PI) / 2, false);
+
+      const linerZPositions = [-0.27, -0.09, 0.09, 0.27];
+      const linerGeo = new THREE.ExtrudeGeometry(handleShape, {
+        depth: 0.026,
+        bevelEnabled: true,
+        bevelSegments: 2,
+        steps: 1,
+        bevelSize: 0.006,
+        bevelThickness: 0.006
+      });
+      linerGeo.center();
+
+      linerZPositions.forEach(zPos => {
+        const liner = new THREE.Mesh(linerGeo, linerAluMat);
+        liner.position.z = zPos;
+        knifeGroup.add(liner);
+      });
+
+      const spacerGeo = new THREE.BoxGeometry(6.0, 0.28, 0.54);
+      const spacerMesh = new THREE.Mesh(spacerGeo, linerAluMat);
+      spacerMesh.position.set(0, -0.05, 0);
+      knifeGroup.add(spacerMesh);
+
+      const scaleGeo = new THREE.ExtrudeGeometry(handleShape, {
+        depth: 0.14,
+        bevelEnabled: true,
+        bevelSegments: 8,
+        steps: 1,
+        bevelSize: 0.055,
+        bevelThickness: 0.055
+      });
+      scaleGeo.center();
+
+      const frontScale = new THREE.Mesh(scaleGeo, raspberryCellidorMat);
+      frontScale.position.z = 0.37;
+      knifeGroup.add(frontScale);
+
+      const backScale = new THREE.Mesh(scaleGeo, raspberryCellidorMat);
+      backScale.position.z = -0.37;
+      knifeGroup.add(backScale);
+
+      const { map: engravedMap, bumpMap: engravedBump } = createEngravedHandleTextures();
+      const engravedMat = new THREE.MeshPhysicalMaterial({
+        map: engravedMap,
+        bumpMap: engravedBump,
+        bumpScale: 0.028,
+        transparent: true,
+        roughness: 0.35,
+        metalness: 0.05,
+        depthWrite: false
+      });
+      const engravedPlane = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 1.38), engravedMat);
+      engravedPlane.position.set(-0.22, 0.01, 0.496);
+      knifeGroup.add(engravedPlane);
+
+      const rivetPositions = [-2.75, 0, 2.75];
+      rivetPositions.forEach(rx => {
+        const rivet = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.62, 16), brassRivetMat);
+        rivet.rotation.x = Math.PI / 2;
+        rivet.position.set(rx, 0, 0);
+        knifeGroup.add(rivet);
+      });
+
+      // Écusson suisse métallique avec photo centrée (en lecture seule)
+      const shieldShape = new THREE.Shape();
+      shieldShape.moveTo(-0.34, 0.34);
+      shieldShape.lineTo(0.34, 0.34);
+      shieldShape.lineTo(0.30, -0.10);
+      shieldShape.quadraticCurveTo(0, -0.39, 0, -0.39);
+      shieldShape.quadraticCurveTo(0, -0.39, -0.30, -0.10);
+      shieldShape.closePath();
+
+      const shieldGeo = new THREE.ExtrudeGeometry(shieldShape, {
+        depth: 0.028,
+        bevelEnabled: true,
+        bevelSegments: 3,
+        bevelSize: 0.014,
+        bevelThickness: 0.014
+      });
+      const shieldFrameMesh = new THREE.Mesh(shieldGeo, createPolishedSteelMat());
+      shieldFrameMesh.position.set(2.58, 0, 0.495);
+      knifeGroup.add(shieldFrameMesh);
+
+      const innerShieldShape = new THREE.Shape();
+      innerShieldShape.moveTo(-0.29, 0.29);
+      innerShieldShape.lineTo(0.29, 0.29);
+      innerShieldShape.lineTo(0.25, -0.08);
+      innerShieldShape.quadraticCurveTo(0, -0.33, 0, -0.33);
+      innerShieldShape.quadraticCurveTo(0, -0.33, -0.25, -0.08);
+      innerShieldShape.closePath();
+
+      const innerShieldGeo = new THREE.ShapeGeometry(innerShieldShape);
+      const posAttr = innerShieldGeo.attributes.position;
+      const uvAttr = innerShieldGeo.attributes.uv;
+      for (let i = 0; i < posAttr.count; i++) {
+        const u = (posAttr.getX(i) + 0.29) / 0.58;
+        const v = (posAttr.getY(i) + 0.33) / 0.62;
+        uvAttr.setXY(i, u, v);
+      }
+
+      const portraitTex = createShieldPortraitTexture();
+      const shieldPhotoMat = new THREE.MeshBasicMaterial({ map: portraitTex });
+      shieldPhotoMesh = new THREE.Mesh(innerShieldGeo, shieldPhotoMat);
+      shieldPhotoMesh.position.set(2.58, 0, 0.538);
+      knifeGroup.add(shieldPhotoMesh);
+
+      shieldLocalPts = [
+        new THREE.Vector3(-0.29,  0.29, 0.005),
+        new THREE.Vector3( 0.29,  0.29, 0.005),
+        new THREE.Vector3( 0.25, -0.08, 0.005),
+        new THREE.Vector3( 0.00, -0.33, 0.005),
+        new THREE.Vector3(-0.25, -0.08, 0.005)
+      ];
+
+      handleMeshes = [frontScale, backScale, engravedPlane, shieldFrameMesh, shieldPhotoMesh];
+
+      // Charge automatiquement la photo de profil sur l'écusson
+      loadShieldPortrait();
+
+      const eyelet = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.06), linerAluMat);
+      eyelet.position.set(-3.58, -0.14, 0.18);
+      const keyRing = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.03, 16, 36), createPolishedSteelMat());
+      keyRing.position.set(-3.82, -0.14, 0.18);
+      keyRing.rotation.y = 0.35;
+      knifeGroup.add(eyelet, keyRing);
+
+      const toolsSpec = [
+        { id: 'formation',  px: -2.85, py:  0.22, pz:  0.18, closedRot: -1.53, openRot:  0.65, len: 2.75, w: 0.38, kind: 'main_blade' },
+        { id: 'stages',     px: -1.45, py:  0.25, pz:  0.00, closedRot: -1.55, openRot:  0.30, len: 2.80, w: 0.32, kind: 'wood_saw' },
+        { id: 'exppro',     px:  0.00, py:  0.26, pz: -0.18, closedRot: -1.56, openRot: -0.02, len: 2.40, w: 0.36, kind: 'scissors' },
+        { id: 'projets',    px:  1.45, py:  0.25, pz:  0.00, closedRot:  1.55, openRot: -0.34, len: 2.35, w: 0.30, kind: 'metal_file' },
+        { id: 'langues',    px:  2.85, py:  0.22, pz:  0.18, closedRot:  1.53, openRot: -0.68, len: 2.00, w: 0.28, kind: 'small_blade' },
+        { id: 'hardskills', px: -2.35, py: -0.22, pz: -0.18, closedRot:  1.52, openRot:  2.42, len: 1.90, w: 0.32, kind: 'can_opener' },
+        { id: 'asso',       px: -0.80, py: -0.26, pz:  0.00, closedRot:  1.57, openRot:  2.95, len: 2.00, w: 0.26, kind: 'corkscrew' },
+        { id: 'hobbies',    px:  0.80, py: -0.26, pz:  0.18, closedRot: -1.57, openRot: -2.95, len: 1.90, w: 0.25, kind: 'reamer_awl' },
+        { id: 'softskills', px:  2.35, py: -0.22, pz: -0.18, closedRot: -1.52, openRot: -2.42, len: 2.00, w: 0.34, kind: 'bottle_opener' }
+      ];
+
+      bladePivots = [];
+      interactiveMeshes = [];
+
+      toolsSpec.forEach(spec => {
+        const pivot = new THREE.Group();
+        pivot.position.set(spec.px, spec.py, spec.pz);
+        pivot.rotation.z = spec.closedRot;
+        pivot.userData = {
+          sectionId: spec.id,
+          closedRot: spec.closedRot,
+          openRot: spec.openRot,
+          hoverLift: 0
+        };
+
+        const steelMat = createPolishedSteelMat();
+
+        if (spec.kind === 'corkscrew') {
+          const baseCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.095, 0.24, 16), steelMat);
+          baseCollar.position.set(0, 0.12, 0);
+          pivot.add(baseCollar);
+
+          const helixPoints = [];
+          const turns = 4.6;
+          const totalH = spec.len - 0.25;
+          for (let i = 0; i <= 110; i++) {
+            const t = i / 110;
+            const angle = t * Math.PI * 2 * turns;
+            const rad = 0.135 * (1 - t * 0.22);
+            helixPoints.push(new THREE.Vector3(Math.cos(angle) * rad, 0.22 + t * totalH, Math.sin(angle) * rad));
+          }
+          const helixCurve = new THREE.CatmullRomCurve3(helixPoints);
+          const helixGeo = new THREE.TubeGeometry(helixCurve, 110, 0.036, 12, false);
+          const helixMesh = new THREE.Mesh(helixGeo, steelMat);
+          pivot.add(helixMesh);
+        } else {
+          const shape = new THREE.Shape();
+          const hw = spec.w * 0.5;
+          const Ltool = spec.len;
+
+          if (spec.kind === 'main_blade' || spec.kind === 'small_blade') {
+            shape.moveTo(-hw, 0);
+            shape.lineTo(hw, 0);
+            shape.lineTo(hw * 0.92, Ltool * 0.72);
+            shape.quadraticCurveTo(hw * 0.4, Ltool * 0.96, 0, Ltool);
+            shape.quadraticCurveTo(-hw * 0.65, Ltool * 0.88, -hw, Ltool * 0.68);
+            shape.closePath();
+          } else if (spec.kind === 'wood_saw') {
+            shape.moveTo(-hw * 0.85, 0);
+            shape.lineTo(hw * 0.85, 0);
+            shape.lineTo(hw * 0.65, Ltool);
+            shape.lineTo(-hw * 0.65, Ltool);
+            const teeth = 16;
+            for (let t = 0; t < teeth; t++) {
+              const yTop = Ltool * (0.94 - (t / teeth) * 0.82);
+              const yMid = yTop - (Ltool * 0.82) / (teeth * 2);
+              shape.lineTo(-hw * 1.15, yMid);
+              shape.lineTo(-hw * 0.72, yMid - (Ltool * 0.82) / (teeth * 2));
+            }
+            shape.closePath();
+          } else if (spec.kind === 'scissors') {
+            shape.moveTo(-hw * 0.7, 0);
+            shape.lineTo(hw * 0.7, 0);
+            shape.lineTo(hw * 1.05, Ltool * 0.55);
+            shape.lineTo(hw * 0.25, Ltool);
+            shape.lineTo(0, Ltool * 0.62);
+            shape.lineTo(-hw * 0.25, Ltool);
+            shape.lineTo(-hw * 1.05, Ltool * 0.55);
+            shape.closePath();
+          } else if (spec.kind === 'can_opener') {
+            shape.moveTo(-hw * 0.8, 0);
+            shape.lineTo(hw * 0.8, 0);
+            shape.lineTo(hw * 0.85, Ltool * 0.58);
+            shape.lineTo(hw * 1.25, Ltool * 0.72);
+            shape.lineTo(hw * 0.55, Ltool * 0.82);
+            shape.lineTo(hw * 0.4, Ltool);
+            shape.lineTo(-hw * 0.4, Ltool);
+            shape.lineTo(-hw * 0.8, Ltool * 0.65);
+            shape.closePath();
+          } else if (spec.kind === 'bottle_opener') {
+            shape.moveTo(-hw * 0.85, 0);
+            shape.lineTo(hw * 0.85, 0);
+            shape.lineTo(hw * 0.85, Ltool * 0.52);
+            shape.lineTo(hw * 0.25, Ltool * 0.58);
+            shape.lineTo(hw * 0.35, Ltool * 0.78);
+            shape.lineTo(hw * 0.95, Ltool * 0.82);
+            shape.lineTo(hw * 0.75, Ltool);
+            shape.lineTo(-hw * 0.75, Ltool);
+            shape.closePath();
+          } else if (spec.kind === 'reamer_awl') {
+            shape.moveTo(-hw * 0.8, 0);
+            shape.lineTo(hw * 0.8, 0);
+            shape.lineTo(hw * 0.35, Ltool * 0.68);
+            shape.lineTo(0, Ltool);
+            shape.lineTo(-hw * 0.35, Ltool * 0.68);
+            shape.closePath();
+          } else {
+            shape.moveTo(-hw * 0.85, 0);
+            shape.lineTo(hw * 0.85, 0);
+            shape.lineTo(hw * 0.72, Ltool * 0.92);
+            shape.lineTo(hw * 0.45, Ltool);
+            shape.lineTo(-hw * 0.45, Ltool);
+            shape.lineTo(-hw * 0.72, Ltool * 0.92);
+            shape.closePath();
+          }
+
+          const toolGeo = new THREE.ExtrudeGeometry(shape, {
+            depth: 0.044,
+            bevelEnabled: true,
+            bevelSegments: 3,
+            steps: 1,
+            bevelSize: 0.009,
+            bevelThickness: 0.009
+          });
+          toolGeo.translate(0, 0, -0.022);
+          const toolMesh = new THREE.Mesh(toolGeo, steelMat);
+          pivot.add(toolMesh);
+        }
+
+        const hitGeo = new THREE.BoxGeometry(Math.max(spec.w * 2.3, 0.72), spec.len + 0.35, 0.42);
+        hitGeo.translate(0, (spec.len + 0.2) * 0.5, 0);
+        const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+        const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+        hitMesh.userData = { sectionId: spec.id };
+        pivot.add(hitMesh);
+        interactiveMeshes.push(hitMesh);
+
+        knifeGroup.add(pivot);
+        bladePivots.push(pivot);
+      });
+
+      setupCanvasEvents(canvas);
+      window.addEventListener('resize', onWindowResize);
+      animate3D();
+    }
+
+    function setHoveredTool(sectionId, clientX = 0, clientY = 0) {
+      if (hoveredSectionId !== sectionId) {
+        hoveredSectionId = sectionId;
+
+        bladePivots.forEach(pivot => {
+          const isMatch = pivot.userData.sectionId === sectionId;
+          pivot.userData.hoverLift = isMatch ? 1 : 0;
+          pivot.traverse(child => {
+            if (child.isMesh && child.material && child.material.emissive) {
+              if (isMatch) {
+                child.material.emissive.setHex(0xb81d58);
+                child.material.emissiveIntensity = 0.55;
+                child.material.color.setHex(0xffffff);
+              } else {
+                child.material.emissive.setHex(0x000000);
+                child.material.emissiveIntensity = 0;
+                child.material.color.setHex(0xf1f5f9);
+              }
+            }
+          });
+        });
+      }
+
+      const tooltip = document.getElementById('tool-hover-tooltip');
+      if (!sectionId || !tooltip) {
+        hideHoverTooltip();
+        return;
+      }
+
+      const data = PORTFOLIO_DATA.find(item => item.id === sectionId);
+      if (!data) return;
+
+      document.getElementById('tooltip-num').textContent = data.num;
+      document.getElementById('tooltip-title').textContent = data.category;
+      document.getElementById('tooltip-toolname').textContent = data.toolLabel;
+
+      const offsetX = clientX > window.innerWidth - 270 ? -245 : 18;
+      const offsetY = clientY > window.innerHeight - 100 ? -72 : 18;
+      tooltip.style.left = `${Math.max(12, clientX + offsetX)}px`;
+      tooltip.style.top = `${Math.max(12, clientY + offsetY)}px`;
+      tooltip.classList.remove('hidden');
+    }
+
+    function hideHoverTooltip() {
+      const tooltip = document.getElementById('tool-hover-tooltip');
+      if (tooltip) tooltip.classList.add('hidden');
+      if (hoveredSectionId !== null) {
+        hoveredSectionId = null;
+        bladePivots.forEach(pivot => {
+          pivot.userData.hoverLift = 0;
+          pivot.traverse(child => {
+            if (child.isMesh && child.material && child.material.emissive) {
+              child.material.emissive.setHex(0x000000);
+              child.material.emissiveIntensity = 0;
+              child.material.color.setHex(0xf1f5f9);
+            }
+          });
+        });
+      }
+    }
+
+    function setupCanvasEvents(canvas) {
+      function updatePointer(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      }
+
+      function pickHoveredBlade() {
+        if (!isKnifeOpen && currentOpen < 0.45) return null;
+        raycaster.setFromCamera(pointerNDC, camera);
+        const hits = raycaster.intersectObjects(interactiveMeshes, false);
+        return hits.length > 0 ? hits[0].object.userData.sectionId : null;
+      }
+
+      canvas.addEventListener('pointerdown', e => {
+        isDragging = true;
+        downPos = { x: e.clientX, y: e.clientY };
+        prevPos = { x: e.clientX, y: e.clientY };
+      });
+
+      window.addEventListener('pointermove', e => {
+        if (isDragging) {
+          const dx = e.clientX - prevPos.x;
+          const dy = e.clientY - prevPos.y;
+          prevPos = { x: e.clientX, y: e.clientY };
+          targetRotY += dx * 0.008;
+          targetRotX = Math.max(-0.85, Math.min(0.85, targetRotX + dy * 0.008));
+          hideHoverTooltip();
+          return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          updatePointer(e.clientX, e.clientY);
+          const hitId = pickHoveredBlade();
+          if (hitId) {
+            canvas.style.cursor = 'pointer';
+            setHoveredTool(hitId, e.clientX, e.clientY);
+          } else {
+            canvas.style.cursor = 'grab';
+            hideHoverTooltip();
+          }
+        } else {
+          hideHoverTooltip();
+        }
+      });
+
+      window.addEventListener('pointerup', onCanvasPointerUp);
+      canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
+    }
+
+    function onCanvasPointerUp(e) {
+      if (!isDragging) return;
+      isDragging = false;
+
+      const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+      if (moved < 6) {
+        const canvas = document.getElementById('knife-3d-canvas');
+        const rect = canvas.getBoundingClientRect();
+        if (
+          e.clientX >= rect.left && e.clientX <= rect.right &&
+          e.clientY >= rect.top && e.clientY <= rect.bottom
+        ) {
+          pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(pointerNDC, camera);
+
+          if (!isKnifeOpen) {
+            const hitsKnife = raycaster.intersectObjects(knifeGroup.children, true);
+            if (hitsKnife.length > 0) openKnife();
+          } else {
+            // Vérifie d'abord si l'utilisateur clique sur une lame/outil
+            const hitsTools = raycaster.intersectObjects(interactiveMeshes, false);
+            if (hitsTools.length > 0) {
+              categoryHistory = [];
+              openCategory(hitsTools[0].object.userData.sectionId, { pushHistory: false });
+              return;
+            }
+            // Sinon, recliquer sur le manche rose framboise referme le couteau suisse
+            const hitsHandle = raycaster.intersectObjects(handleMeshes, false);
+            if (hitsHandle.length > 0) {
+              closeKnife();
+            }
+          }
+        }
+      }
+    }
+
+    function onCanvasWheel(e) {
+      e.preventDefault();
+      targetZoom = Math.max(5.5, Math.min(11.5, targetZoom + e.deltaY * 0.004));
+    }
+
+    function openKnife() {
+      isKnifeOpen = true;
+      targetOpen = 1;
+      targetRotY = 0;
+      targetRotX = 0.08;
+      targetZoom = 8.4;
+      document.getElementById('open-controls').classList.remove('hidden');
+    }
+
+    function closeKnife() {
+      isKnifeOpen = false;
+      targetOpen = 0;
+      targetRotY = -0.14;
+      targetRotX = 0.12;
+      targetZoom = 7.4;
+      hideHoverTooltip();
+      document.getElementById('open-controls').classList.add('hidden');
+    }
+
+    function onWindowResize() {
+      const stage = document.getElementById('knife-stage');
+      if (!stage || !camera || !renderer) return;
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      if (!knifeGroup || !renderer || !scene || !camera) return;
+
+      // Ouverture & fermeture lentes, progressives et fluides
+      currentOpen += (targetOpen - currentOpen) * 0.022;
+
+      bladePivots.forEach((pivot, idx) => {
+        const stagger = Math.max(0, Math.min(1, currentOpen * 1.35 - idx * 0.042));
+        const ease = 1 - Math.pow(1 - stagger, 3);
+        pivot.rotation.z = pivot.userData.closedRot + (pivot.userData.openRot - pivot.userData.closedRot) * ease;
+
+        const targetScale = 1 + (pivot.userData.hoverLift || 0) * 0.065;
+        pivot.scale.x += (targetScale - pivot.scale.x) * 0.14;
+        pivot.scale.y += (targetScale - pivot.scale.y) * 0.14;
+      });
+
+      if (!isDragging) {
+        const t = performance.now() * 0.0012;
+        knifeGroup.position.y = Math.sin(t) * 0.045;
+      }
+
+      knifeGroup.rotation.y += (targetRotY - knifeGroup.rotation.y) * 0.048;
+      knifeGroup.rotation.x += (targetRotX - knifeGroup.rotation.x) * 0.048;
+      camera.position.z += (targetZoom - camera.position.z) * 0.048;
+
+      renderer.render(scene, camera);
+      updateShieldPhotoOverlay();
+    }
+
+    // =========================================================================
+    // VUE DÉVELOPPÉE D'UNE CATÉGORIE
+    // =========================================================================
+    function openCategory(id, options = {}) {
+      const { pushHistory = true, highlightIdx = null } = options;
+      const idx = PORTFOLIO_DATA.findIndex(item => item.id === id);
+      if (idx === -1) return;
+
+      if (pushHistory && currentCategoryId && currentCategoryId !== id) {
+        categoryHistory.push(currentCategoryId);
+      }
+      currentCategoryId = id;
+
+      const item = PORTFOLIO_DATA[idx];
+      const prevItem = PORTFOLIO_DATA[(idx - 1 + PORTFOLIO_DATA.length) % PORTFOLIO_DATA.length];
+      const nextItem = PORTFOLIO_DATA[(idx + 1) % PORTFOLIO_DATA.length];
+
+      const backId = categoryHistory.length > 0 ? categoryHistory[categoryHistory.length - 1] : null;
+      const backData = backId ? PORTFOLIO_DATA.find(p => p.id === backId) : null;
+
+      const itemsHtml = item.items.map((exp, eIdx) => {
+        const isHighlighted = highlightIdx === eIdx;
+        return `
+          <div id="exp-item-${eIdx}" class="p-5 rounded-2xl transition-all duration-300 ${
+            isHighlighted
+              ? 'bg-raspberry-50/75 border-2 border-raspberry-600 proof-highlight'
+              : 'bg-white border border-slate-200'
+          }">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div class="flex items-center gap-3.5">
+                ${exp.flagSvg ? `
+                  <div class="w-14 h-9 rounded-lg overflow-hidden border border-slate-200 shadow-2xs flex-shrink-0">
+                    ${exp.flagSvg}
+                  </div>
+                ` : ''}
+                <div>
+                  ${isHighlighted ? `
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-raspberry-700 text-white mb-2">
+                      ✦ Preuve associée à la compétence
+                    </span>
+                  ` : ''}
+                  <h4 class="font-display font-bold text-base text-slateeng-900">${exp.title}</h4>
+                  <p class="text-xs font-medium text-slate-500 mt-0.5">${exp.period}</p>
+                </div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-raspberry-50 text-raspberry-800 border border-raspberry-200">
+                ${exp.tag}
+              </span>
+            </div>
+            <ul class="mt-3.5 space-y-2 text-xs sm:text-sm text-slate-700 leading-relaxed">
+              ${exp.details.map(d => `
+                <li class="flex items-start gap-2.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-raspberry-700 mt-2 flex-shrink-0"></span>
+                  <span>${d}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }).join('');
+
+      const sigmaCompetencesHtml = item.hasSigmaCompetences ? `
+        <div class="space-y-3 pt-2">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-raspberry-700">Ingénieure SIGMA Clermont × Master MAE (IAE)</span>
+              <h3 class="font-display text-lg font-extrabold text-slateeng-900">Compétences clés &amp; preuves associées</h3>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            ${SIGMA_COMPETENCES.map(c => {
+              const target = PORTFOLIO_DATA.find(t => t.id === c.toolId);
+              return `
+                <div class="p-4 rounded-2xl bg-raspberry-50/40 border border-raspberry-200/70 flex flex-col justify-between gap-2.5">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-6 h-6 rounded-lg bg-raspberry-700 text-white font-display font-extrabold text-[11px] flex items-center justify-center">${c.num}</span>
+                      <h4 class="font-display font-bold text-sm text-slateeng-900">${c.title}</h4>
+                    </div>
+                    <p class="text-xs text-slate-600 mt-2 leading-relaxed">${c.proof}</p>
+                  </div>
+                  <button onclick="openCategory('${c.toolId}', { pushHistory: true, highlightIdx: ${c.highlightIdx} })" class="self-start text-xs font-bold text-raspberry-700 hover:text-raspberry-900 hover:underline">
+                    Voir la preuve dans ${target ? target.category : ''} →
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : '';
+
+      const photosHtml = item.photos && item.photos.length > 0 ? `
+        <div class="space-y-3">
+          <h3 class="font-display text-xs font-extrabold uppercase tracking-wider text-raspberry-700">Illustrations</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-${item.photos.length > 2 ? '3' : '2'} gap-4">
+            ${item.photos.map(p => `
+              <div class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex flex-col">
+                <div class="aspect-video w-full overflow-hidden relative flex items-center justify-center" style="background:${p.bg}">
+                  <img src="${encodeURI(p.src)}" alt="${p.caption}" class="w-full h-full object-cover" />
+                </div>
+                <div class="px-3.5 py-2.5 text-xs font-semibold text-slate-700 bg-white border-t border-slate-100">
+                  ${p.caption}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : '';
+
+      const card = document.getElementById('category-card');
+      card.innerHTML = `
+        <div class="bg-gradient-to-r from-raspberry-800 via-raspberry-700 to-raspberry-600 text-white p-6 sm:p-8">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            ${backData ? `
+              <button onclick="goBackCategory()" class="px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition">
+                ← Retour à ${backData.num}. ${backData.category}
+              </button>
+            ` : `
+              <button onclick="closeCategory()" class="px-3.5 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition">
+                ← Retour au couteau suisse
+              </button>
+            `}
+            <button onclick="closeCategory()" class="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 text-white font-bold text-sm flex items-center justify-center flex-shrink-0 transition" title="Fermer">
+              ✕
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-raspberry-100">
+            <span>${item.num}</span>
+            <span>•</span>
+            <span>${item.toolLabel}</span>
+            <span>•</span>
+            <span>${item.period}</span>
+          </div>
+          <h2 class="font-display text-2xl sm:text-3xl font-extrabold mt-1 tracking-tight">${item.category}</h2>
+          <p class="text-xs sm:text-sm text-raspberry-100 mt-1">${item.subtitle}</p>
+
+          <div class="flex flex-wrap gap-1.5 mt-4">
+            ${item.competences.map(c => `<span class="px-2.5 py-1 rounded-lg bg-black/20 text-[11px] font-semibold text-white">${c}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="p-6 sm:p-8 space-y-6">
+          <p class="text-sm text-slate-700 leading-relaxed bg-raspberry-50/70 border border-raspberry-100 p-4 rounded-2xl">
+            ${item.summary}
+          </p>
+
+          <div class="space-y-4">
+            ${itemsHtml}
+          </div>
+
+          ${sigmaCompetencesHtml}
+          ${photosHtml}
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div class="p-4 rounded-2xl bg-raspberry-50/70 border border-raspberry-200/70">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-raspberry-800">Regard Réflexif · Ce que j’ai acquis</span>
+              <p class="text-xs sm:text-sm text-slate-700 mt-1.5 leading-relaxed">${item.reflexive.acquis}</p>
+            </div>
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-700">Regard Réflexif · Axes de progression</span>
+              <p class="text-xs sm:text-sm text-slate-700 mt-1.5 leading-relaxed">${item.reflexive.axes}</p>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-raspberry-100 flex flex-wrap items-center justify-between gap-3">
+            <button onclick="openCategory('${prevItem.id}', { pushHistory: true })" class="px-4 py-2 rounded-xl text-xs font-bold bg-raspberry-50 hover:bg-raspberry-100 text-raspberry-900 transition">
+              ← ${prevItem.num}. ${prevItem.category}
+            </button>
+            <button onclick="closeCategory()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">
+              Revenir au couteau suisse
+            </button>
+            <button onclick="openCategory('${nextItem.id}', { pushHistory: true })" class="px-4 py-2 rounded-xl text-xs font-bold bg-raspberry-700 hover:bg-raspberry-800 text-white transition">
+              ${nextItem.num}. ${nextItem.category} →
+            </button>
+          </div>
+        </div>
+      `;
+
+      const overlay = document.getElementById('category-overlay');
+      overlay.classList.remove('hidden');
+
+      if (highlightIdx !== null) {
+        setTimeout(() => {
+          const targetEl = document.getElementById(`exp-item-${highlightIdx}`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 80);
+      } else {
+        overlay.scrollTop = 0;
+      }
+    }
+
+    function goBackCategory() {
+      if (categoryHistory.length === 0) {
+        closeCategory();
+        return;
+      }
+      const prevId = categoryHistory.pop();
+      openCategory(prevId, { pushHistory: false });
+    }
+
+    function closeCategory() {
+      document.getElementById('category-overlay').classList.add('hidden');
+      currentCategoryId = null;
+      categoryHistory = [];
+    }
+
+    // =========================================================================
+    // MODALE CONTACT, CV & LINKEDIN
+    // =========================================================================
+    function openContactModal() {
+      const cvBtn = document.getElementById('cv-download-btn');
+      const liLink = document.getElementById('linkedin-profile-link');
+      const qrImg = document.getElementById('linkedin-qr-img');
+      if (cvBtn) {
+        cvBtn.href = encodeURI(CV_PDF_URL);
+        cvBtn.setAttribute('download', CV_PDF_URL);
+      }
+      if (liLink) liLink.href = LINKEDIN_URL;
+      if (qrImg) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=831843&bgcolor=fdf2f7&data=${encodeURIComponent(LINKEDIN_URL)}`;
+      }
+      document.getElementById('contact-modal').classList.remove('hidden');
+    }
+
+    function closeContactModal() {
+      document.getElementById('contact-modal').classList.add('hidden');
+    }
+
+    function copyText(text, btn) {
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      const old = btn.textContent;
+      btn.textContent = 'Copié ✓';
+      setTimeout(() => (btn.textContent = old), 1500);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeCategory();
+        closeContactModal();
+      }
+    });
+
+    window.addEventListener('load', () => {
+      initRealisticSwissKnife();
+    });
+  </script>
+</body>
+</html>
